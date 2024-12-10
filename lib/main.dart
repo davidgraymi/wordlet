@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:wordlet/temp_word_list.dart';
 import 'package:wordlet/wordlet.dart';
 import 'package:http/http.dart' as http;
 
@@ -37,7 +40,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: Wordlet(
-        target: "KEEPS", client: client, // TODO: get word from database
+        target: theList[Random().nextInt(theList.length)], client: client, // TODO: get word from database
       ),
     );
   }

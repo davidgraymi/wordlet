@@ -1,8 +1,10 @@
 import 'package:confetti/confetti.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:share_plus/share_plus.dart';
 
 import 'constants.dart';
 
@@ -17,6 +19,26 @@ const Map<LetterHint, Color> _defaultHintToColorMap = {
   LetterHint.wrongPlace: Color(0xfffdd835),
   LetterHint.correct: Color(0xff4ca750)
 };
+
+String helperFormatHintString(List<List<LetterHint>> hints) {
+  String retval = "";
+  for (int i = 0; i < hints.length; i++) {
+    for (int j = 0; j < hints[i].length; j++) {
+      switch (hints[i][j]) {
+        case LetterHint.none:
+        // TODO: Handle this case.
+        case LetterHint.incorrect:
+          retval += "⬜️";
+        case LetterHint.wrongPlace:
+          retval += "🟨";
+        case LetterHint.correct:
+          retval += "🟩";
+      }
+    }
+    retval += "\n";
+  }
+  return retval;
+}
 
 class Wordlet extends StatefulWidget {
   /// Creates a widget to play a single game of Wordlet.
@@ -148,21 +170,23 @@ class _WordletState extends State<Wordlet> {
       }
 
       int total = dupeMap[key]!.$1.length + dupeMap[key]!.$2.length;
-      if (total > 1 && _charMap[key]!.isNotEmpty) {
-        int o = dupeMap[key]!.$2.length - 1;
-        if (kDebugMode) {
-          print("total: $total");
-        }
-        while (total > _charMap[key]!.length) {
-          int out = dupeMap[key]!.$2[o];
+      if (_charMap[key] != null) {
+        if (total > 1 && _charMap[key]!.isNotEmpty) {
+          int o = dupeMap[key]!.$2.length - 1;
           if (kDebugMode) {
-            print("changing $out to LetterHint.incorrect");
+            print("total: $total");
           }
-          setState(() {
-            _hints[_index][dupeMap[key]!.$2[o]] = LetterHint.incorrect;
-          });
-          total--;
-          o--;
+          while (total > _charMap[key]!.length) {
+            int out = dupeMap[key]!.$2[o];
+            if (kDebugMode) {
+              print("changing $out to LetterHint.incorrect");
+            }
+            setState(() {
+              _hints[_index][dupeMap[key]!.$2[o]] = LetterHint.incorrect;
+            });
+            total--;
+            o--;
+          }
         }
       }
     }
@@ -347,6 +371,25 @@ class _WordletState extends State<Wordlet> {
               ),
             ),
           ),
+          SafeArea(
+            child: Align(
+              alignment: const Alignment(0, 0.82),
+              child:
+                  (_gameState == GameState.lose || _gameState == GameState.win)
+                      ? IconButton(
+                          onPressed: () async {
+                            var str = helperFormatHintString(_hints);
+                            final result = await Share.share(str);
+
+                            if (result.status == ShareResultStatus.success) {
+                              print('Thank you for sharing my website!');
+                            }
+                          },
+                          icon: const Icon(CupertinoIcons.share),
+                        )
+                      : null,
+            ),
+          ),
           ConfettiWidget(
             confettiController: _confettiController,
             gravity: 0.2,
@@ -377,27 +420,39 @@ class Word extends StatelessWidget {
     return SizedBox(
       height: 70,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Letter(
             char: chars.isNotEmpty ? chars[0] : '',
             hint: hints[0],
             hintToColor: hintToColor,
           ),
+          const SizedBox(
+            width: 5,
+          ),
           Letter(
             char: chars.length > 1 ? chars[1] : '',
             hint: hints[1],
             hintToColor: hintToColor,
+          ),
+          const SizedBox(
+            width: 5,
           ),
           Letter(
             char: chars.length > 2 ? chars[2] : '',
             hint: hints[2],
             hintToColor: hintToColor,
           ),
+          const SizedBox(
+            width: 5,
+          ),
           Letter(
             char: chars.length > 3 ? chars[3] : '',
             hint: hints[3],
             hintToColor: hintToColor,
+          ),
+          const SizedBox(
+            width: 5,
           ),
           Letter(
             char: chars.length > 4 ? chars[4] : '',
