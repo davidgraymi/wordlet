@@ -1,8 +1,8 @@
 import 'package:confetti/confetti.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 
 import 'constants.dart';
 
@@ -29,7 +29,8 @@ class Wordlet extends StatefulWidget {
       this.backgroundColor,
       this.textInputColor,
       this.textFrozenColor,
-      this.hintToColor = _defaultHintToColorMap})
+      this.hintToColor = _defaultHintToColorMap,
+      required this.client})
       : assert(target.length == 5),
         assert(alphaCapReg.allMatches(target).length == 5);
 
@@ -39,6 +40,7 @@ class Wordlet extends StatefulWidget {
   final Color? textInputColor;
   final Color? textFrozenColor;
   final Map<LetterHint, Color>? hintToColor;
+  final http.Client client;
 
   @override
   State<Wordlet> createState() => _WordletState();
@@ -53,6 +55,7 @@ class _WordletState extends State<Wordlet> {
     duration: const Duration(milliseconds: 100),
   );
   List<String> _targetChars = [];
+  Map<String, List<int>> _charMap = {};
   List<String> _words = [];
   List<List<LetterHint>> _hints = [];
   int _index = 0;
@@ -62,6 +65,13 @@ class _WordletState extends State<Wordlet> {
   ///
   /// TODO: implement
   bool isWordValid(String word) {
+    // String db = "https://api.dictionaryapi.dev/api/v2/entries/en/$word";
+    // var url = Uri.https('api.dictionaryapi.dev', 'api/v2/entries/en/$word');
+    // var response = await widget.client.get(url);
+    // print('Response status: ${response.statusCode}');
+    // print('Response body: ${response.body}');
+    //
+    // print(await http.read(Uri.https('example.com', 'foobar.txt')));
     return (word.length == _wordLength);
   }
 
@@ -76,39 +86,85 @@ class _WordletState extends State<Wordlet> {
       _focusNode.dispose();
       _gameState = GameState.win;
     });
-
-    if (kDebugMode) {
-      print("you win!");
-    }
   }
 
+  /// Updates the hints
+  ///
+  /// Only mark letters as [LetterHint.wrongPlace] as many times as it occurs in [target].
+  ///
+  /// ### Example
+  /// target = "TWERK", input = "WEEKS"
+  ///  - only the E in position 3 would be marked [LetterHint.correct]
+  ///  - the E in position 2 would be marked [LetterHint.incorrect]
+  ///
+  /// ### Example 2
+  /// target = "TWERK", input = "THREE"
+  ///  - only the E in position 4 would be marked [LetterHint.wrongPlace]
+  ///  - the E in position 5 would be marked [LetterHint.incorrect]
   void updateHints(String word) {
-    if (kDebugMode) {
-      print("updating hints");
-    }
-
     List<String> myChars = word.split('');
+    // duplicate map $1 = correct, $2 = wrong place
+    Map<String, (List<int>, List<int>)> dupeMap = {};
+
+    // Initial label for characters
     for (int i = 0; i < _wordLength; i++) {
+      // Correct character, correct place
       if (myChars[i] == _targetChars[i]) {
         setState(() => _hints[_index][i] = LetterHint.correct);
-        if (kDebugMode) {
-          print("hint[$_index][$i] correct");
-        }
+        // update duplicate map
+        dupeMap.update(myChars[i], ((List<int>, List<int>) value) {
+          value.$1.add(i);
+          return value;
+        }, ifAbsent: () {
+          return ([i], []);
+        });
+        // Correct character, wrong place
       } else if (widget.target.contains(myChars[i])) {
         setState(() => _hints[_index][i] = LetterHint.wrongPlace);
-        if (kDebugMode) {
-          print("hint[$_index][$i] wrong place");
-        }
+        // update map
+        dupeMap.update(myChars[i], ((List<int>, List<int>) value) {
+          value.$2.add(i);
+          return value;
+        }, ifAbsent: () {
+          return ([], [i]);
+        });
+        // Wrong character
       } else {
         setState(() => _hints[_index][i] = LetterHint.incorrect);
-        if (kDebugMode) {
-          print("hint[$_index][$i] incorrect");
-        }
       }
     }
 
     if (kDebugMode) {
-      print(_hints);
+      print("---------------");
+      // print("hints: $_hints");
+      print("$dupeMap");
+      print("$_charMap");
+    }
+
+    // Iterate through any duplicate characters and clean up extra labeling that causes confusion.
+    for (String key in dupeMap.keys) {
+      if (kDebugMode) {
+        print("$key");
+      }
+
+      int total = dupeMap[key]!.$1.length + dupeMap[key]!.$2.length;
+      if (total > 1 && _charMap[key]!.isNotEmpty) {
+        int o = dupeMap[key]!.$2.length - 1;
+        if (kDebugMode) {
+          print("total: $total");
+        }
+        while (total > _charMap[key]!.length) {
+          int out = dupeMap[key]!.$2[o];
+          if (kDebugMode) {
+            print("changing $out to LetterHint.incorrect");
+          }
+          setState(() {
+            _hints[_index][dupeMap[key]!.$2[o]] = LetterHint.incorrect;
+          });
+          total--;
+          o--;
+        }
+      }
     }
   }
 
@@ -125,14 +181,6 @@ class _WordletState extends State<Wordlet> {
           _focusNode.dispose();
           _gameState = GameState.lose;
         });
-
-        if (kDebugMode) {
-          print("you lose");
-        }
-      } else {
-        if (kDebugMode) {
-          print("incorrect! try again");
-        }
       }
     }
   }
@@ -149,25 +197,23 @@ class _WordletState extends State<Wordlet> {
         return KeyEventResult.handled;
       }
       return KeyEventResult.ignored;
+      // If [backspace] was pressed
     } else if (event.logicalKey == LogicalKeyboardKey.backspace &&
         _words[_index].isNotEmpty &&
         event.runtimeType == KeyDownEvent) {
       setState(() {
         _words[_index] = _words[_index].substring(0, _words[_index].length - 1);
       });
-      if (kDebugMode) {
-        print(_words[_index]);
-      }
+
       return KeyEventResult.handled;
+      // If a character was pressed
     } else if (event.character != null) {
       var upper = event.character!.toUpperCase();
-      if (upper.contains(alphaLowReg) && _words[_index].length < _wordLength) {
+      if (upper.contains(alphaCapReg) && _words[_index].length < _wordLength) {
         setState(() {
           _words[_index] += upper;
         });
-        if (kDebugMode) {
-          print(_words[_index]);
-        }
+
         return KeyEventResult.handled;
       }
     }
@@ -187,6 +233,15 @@ class _WordletState extends State<Wordlet> {
       duration: const Duration(milliseconds: 100),
     );
 
+    for (int i = 0; i < _targetChars.length; i++) {
+      _charMap.update(_targetChars[i], (List<int> value) {
+        value.add(i);
+        return value;
+      }, ifAbsent: () {
+        return [i];
+      });
+    }
+
     super.initState();
   }
 
@@ -203,46 +258,7 @@ class _WordletState extends State<Wordlet> {
       autofocus: true,
       descendantsAreFocusable: false,
       focusNode: _focusNode,
-      onKeyEvent: (FocusNode node, KeyEvent event) {
-        // If [enter] key is pressed down and the word is 5 letters
-        if (event.logicalKey == LogicalKeyboardKey.enter &&
-            _words[_index].length == _wordLength &&
-            event.runtimeType == KeyDownEvent) {
-          // If word is valid english
-          if (isWordValid(_words[_index])) {
-            // Submit
-            submitWord(_words[_index]);
-            return KeyEventResult.handled;
-          }
-          return KeyEventResult.ignored;
-          // If [backspace] was pressed
-        } else if (event.logicalKey == LogicalKeyboardKey.backspace &&
-            _words[_index].isNotEmpty &&
-            event.runtimeType == KeyDownEvent) {
-          setState(() {
-            _words[_index] =
-                _words[_index].substring(0, _words[_index].length - 1);
-          });
-          if (kDebugMode) {
-            print(_words[_index]);
-          }
-          return KeyEventResult.handled;
-          // If a character was pressed
-        } else if (event.character != null) {
-          var upper = event.character!.toUpperCase();
-          if (upper.contains(alphaCapReg) &&
-              _words[_index].length < _wordLength) {
-            setState(() {
-              _words[_index] += upper;
-            });
-            if (kDebugMode) {
-              print(_words[_index]);
-            }
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
+      onKeyEvent: keyEventHandler,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -407,9 +423,6 @@ class Letter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kDebugMode) {
-      print(hintToColor);
-    }
     return Container(
       width: 70,
       height: 70,
