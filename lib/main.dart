@@ -29,6 +29,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: const ColorScheme.light(
           primary: Colors.white,
+          surface: Colors.white,
         ),
         useMaterial3: true,
         textTheme: TextTheme(

@@ -20,6 +20,13 @@ const Map<LetterHint, Color> _defaultHintToColorMap = {
   LetterHint.correct: Color(0xff4ca750)
 };
 
+const Map<LetterHint, Color> _defaultHintToKeyColorMap = {
+  LetterHint.none: Color(0xffd6d6d6),
+  LetterHint.incorrect: Color(0xff9e9e9e),
+  LetterHint.wrongPlace: Color(0xfffdd835),
+  LetterHint.correct: Color(0xff4ca750)
+};
+
 class Wordlet extends StatefulWidget {
   /// Creates a widget to play a single game of Wordlet.
   ///
@@ -52,6 +59,34 @@ class _WordletState extends State<Wordlet> {
   final _wordLength = 5;
   final _maxWords = 6;
   final Map<String, List<int>> _charMap = {};
+  final Map<String, LetterHint> _keyMap = {
+    'Q': LetterHint.none,
+    'W': LetterHint.none,
+    'E': LetterHint.none,
+    'R': LetterHint.none,
+    'T': LetterHint.none,
+    'Y': LetterHint.none,
+    'U': LetterHint.none,
+    'I': LetterHint.none,
+    'O': LetterHint.none,
+    'P': LetterHint.none,
+    'A': LetterHint.none,
+    'S': LetterHint.none,
+    'D': LetterHint.none,
+    'F': LetterHint.none,
+    'G': LetterHint.none,
+    'H': LetterHint.none,
+    'J': LetterHint.none,
+    'K': LetterHint.none,
+    'L': LetterHint.none,
+    'Z': LetterHint.none,
+    'X': LetterHint.none,
+    'C': LetterHint.none,
+    'V': LetterHint.none,
+    'B': LetterHint.none,
+    'N': LetterHint.none,
+    'M': LetterHint.none,
+  };
 
   late FocusNode _focusNode;
   late ConfettiController _confettiController;
@@ -145,7 +180,10 @@ class _WordletState extends State<Wordlet> {
     for (int i = 0; i < _wordLength; i++) {
       // Correct character, correct place
       if (myChars[i] == _targetChars[i]) {
-        setState(() => _hints[_index][i] = LetterHint.correct);
+        setState(() {
+          _hints[_index][i] = LetterHint.correct;
+          _keyMap[myChars[i]] = LetterHint.correct;
+        });
         // update duplicate map
         dupeMap.update(myChars[i], ((List<int>, List<int>) value) {
           value.$1.add(i);
@@ -155,7 +193,12 @@ class _WordletState extends State<Wordlet> {
         });
         // Correct character, wrong place
       } else if (widget.target.contains(myChars[i])) {
-        setState(() => _hints[_index][i] = LetterHint.wrongPlace);
+        setState(() {
+          _hints[_index][i] = LetterHint.wrongPlace;
+          if (_keyMap[myChars[i]] != LetterHint.correct) {
+            _keyMap[myChars[i]] = LetterHint.wrongPlace;
+          }
+        });
         // update map
         dupeMap.update(myChars[i], ((List<int>, List<int>) value) {
           value.$2.add(i);
@@ -165,7 +208,13 @@ class _WordletState extends State<Wordlet> {
         });
         // Wrong character
       } else {
-        setState(() => _hints[_index][i] = LetterHint.incorrect);
+        setState(() {
+          _hints[_index][i] = LetterHint.incorrect;
+          if (_keyMap[myChars[i]] != LetterHint.correct ||
+              _keyMap[myChars[i]] != LetterHint.wrongPlace) {
+            _keyMap[myChars[i]] = LetterHint.incorrect;
+          }
+        });
       }
     }
 
@@ -290,7 +339,7 @@ class _WordletState extends State<Wordlet> {
     _index = 0;
     _gameState = GameState.inProgress;
     _confettiController = ConfettiController(
-      duration: const Duration(milliseconds: 100),
+      duration: const Duration(milliseconds: 300),
     );
 
     for (int i = 0; i < _targetChars.length; i++) {
@@ -324,78 +373,83 @@ class _WordletState extends State<Wordlet> {
 
   @override
   Widget build(BuildContext context) {
-    return KeyboardListener(
-      focusNode: _focusNode,
-      onKeyEvent: keyEventHandler,
-      autofocus: true,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            color: Theme.of(context).colorScheme.surface,
-            child: SafeArea(
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: KeyboardListener(
+        focusNode: _focusNode,
+        onKeyEvent: keyEventHandler,
+        autofocus: true,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        minWidth: 300,
-                        maxWidth: 370,
+                    const Spacer(
+                      flex: 1,
+                    ),
+                    Expanded(
+                      flex: 15,
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Word(
+                              chars: _words[0].split(''),
+                              hints: _hints[0],
+                              hintToColor: widget.hintToColor,
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Word(
+                              chars: _words[1].split(''),
+                              hints: _hints[1],
+                              hintToColor: widget.hintToColor,
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Word(
+                              chars: _words[2].split(''),
+                              hints: _hints[2],
+                              hintToColor: widget.hintToColor,
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Word(
+                              chars: _words[3].split(''),
+                              hints: _hints[3],
+                              hintToColor: widget.hintToColor,
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Word(
+                              chars: _words[4].split(''),
+                              hints: _hints[4],
+                              hintToColor: widget.hintToColor,
+                            ),
+                            const SizedBox(
+                              height: 5,
+                            ),
+                            Word(
+                              chars: _words[5].split(''),
+                              hints: _hints[5],
+                              hintToColor: widget.hintToColor,
+                            ),
+                            const SizedBox(
+                              height: 10,
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          Word(
-                            chars: _words[0].split(''),
-                            hints: _hints[0],
-                            hintToColor: widget.hintToColor,
-                          ),
-                          const SizedBox(
-                            height: 5,
-                          ),
-                          Word(
-                            chars: _words[1].split(''),
-                            hints: _hints[1],
-                            hintToColor: widget.hintToColor,
-                          ),
-                          const SizedBox(
-                            height: 5,
-                          ),
-                          Word(
-                            chars: _words[2].split(''),
-                            hints: _hints[2],
-                            hintToColor: widget.hintToColor,
-                          ),
-                          const SizedBox(
-                            height: 5,
-                          ),
-                          Word(
-                            chars: _words[3].split(''),
-                            hints: _hints[3],
-                            hintToColor: widget.hintToColor,
-                          ),
-                          const SizedBox(
-                            height: 5,
-                          ),
-                          Word(
-                            chars: _words[4].split(''),
-                            hints: _hints[4],
-                            hintToColor: widget.hintToColor,
-                          ),
-                          const SizedBox(
-                            height: 5,
-                          ),
-                          Word(
-                            chars: _words[5].split(''),
-                            hints: _hints[5],
-                            hintToColor: widget.hintToColor,
-                          ),
-                          const SizedBox(
-                            height: 10,
-                          ),
-                        ],
-                      ),
+                    ),
+                    const Spacer(
+                      flex: 1,
                     ),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 550),
@@ -403,140 +457,145 @@ class _WordletState extends State<Wordlet> {
                         onCharacterTap: onCharacter,
                         onBackspaceTap: onBackspace,
                         onEnterTap: onEnter,
+                        keys: _keyMap,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
-          ),
-          SafeArea(
-            child: Align(
-              alignment: const Alignment(0, -0.88),
-              child: AnimatedContainer(
-                height: 45,
-                width: 110,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: _gameState == GameState.lose
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(4.0),
+            SafeArea(
+              child: Align(
+                alignment: const Alignment(0, -0.88),
+                child: AnimatedContainer(
+                  height: 45,
+                  width: 110,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _gameState == GameState.lose
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(4.0),
+                  ),
+                  duration: const Duration(milliseconds: 200),
+                  child: _gameState == GameState.lose
+                      ? Text(
+                          widget.target,
+                          style: Theme.of(context)
+                              .textTheme
+                              .displayMedium!
+                              .copyWith(
+                                  color: Theme.of(context).colorScheme.surface),
+                        )
+                      : null,
                 ),
-                duration: const Duration(milliseconds: 200),
-                child: _gameState == GameState.lose
-                    ? Text(
-                        widget.target,
-                        style: Theme.of(context)
-                            .textTheme
-                            .displayMedium!
-                            .copyWith(
-                                color: Theme.of(context).colorScheme.surface),
+              ),
+            ),
+            SafeArea(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: (_gameState == GameState.lose ||
+                        _gameState == GameState.win)
+                    ? Padding(
+                        padding:
+                            const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              child: ElevatedButton(
+                                style: ButtonStyle(
+                                  backgroundColor:
+                                      WidgetStateProperty.resolveWith<Color?>(
+                                          (Set<WidgetState> states) {
+                                    return Theme.of(context)
+                                        .colorScheme
+                                        .surface;
+                                  }),
+                                  padding: WidgetStateProperty.resolveWith<
+                                          EdgeInsetsGeometry?>(
+                                      (Set<WidgetState> states) {
+                                    return const EdgeInsets.all(16);
+                                  }),
+                                  elevation:
+                                      WidgetStateProperty.resolveWith<double?>(
+                                          (Set<WidgetState> states) {
+                                    return 20;
+                                  }),
+                                ),
+                                onPressed: () async {
+                                  var str = helperFormatHintString(_hints);
+                                  final result = await Share.share(str,
+                                      subject: getSubject());
+
+                                  if (result.status ==
+                                      ShareResultStatus.success) {
+                                    print('Thank you for sharing my website!');
+                                  }
+                                },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      "Share with a friend!",
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Icon(
+                                      CupertinoIcons.share,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       )
                     : null,
               ),
             ),
-          ),
-          SafeArea(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: (_gameState == GameState.lose ||
-                      _gameState == GameState.win)
-                  ? Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            child: ElevatedButton(
-                              style: ButtonStyle(
-                                backgroundColor:
-                                    WidgetStateProperty.resolveWith<Color?>(
-                                        (Set<WidgetState> states) {
-                                  return Theme.of(context).colorScheme.surface;
-                                }),
-                                padding: WidgetStateProperty.resolveWith<
-                                        EdgeInsetsGeometry?>(
-                                    (Set<WidgetState> states) {
-                                  return const EdgeInsets.all(16);
-                                }),
-                                elevation:
-                                    WidgetStateProperty.resolveWith<double?>(
-                                        (Set<WidgetState> states) {
-                                  return 20;
-                                }),
-                              ),
-                              onPressed: () async {
-                                var str = helperFormatHintString(_hints);
-                                final result = await Share.share(str,
-                                    subject: getSubject());
-
-                                if (result.status ==
-                                    ShareResultStatus.success) {
-                                  print('Thank you for sharing my website!');
-                                }
-                              },
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(
-                                    "Share with a friend!",
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .onSurface),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Icon(
-                                    CupertinoIcons.share,
-                                    color:
-                                        Theme.of(context).colorScheme.onSurface,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : null,
+            ConfettiWidget(
+              confettiController: _confettiController,
+              gravity: 0.2,
+              minBlastForce: 1,
+              maxBlastForce: 200,
+              numberOfParticles: 1000,
+              blastDirectionality: BlastDirectionality.explosive,
+              colors: widget.confettiColors,
             ),
-          ),
-          ConfettiWidget(
-            confettiController: _confettiController,
-            gravity: 0.2,
-            minBlastForce: 1,
-            maxBlastForce: 200,
-            numberOfParticles: 1000,
-            blastDirectionality: BlastDirectionality.explosive,
-            colors: widget.confettiColors,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
 class SoftKeyboard extends StatelessWidget {
-  SoftKeyboard(
+  const SoftKeyboard(
       {super.key,
       required this.onCharacterTap,
       required this.onBackspaceTap,
-      required this.onEnterTap});
+      required this.onEnterTap,
+      required this.keys,
+      this.hintToColor = _defaultHintToKeyColorMap});
 
+  final Map<LetterHint, Color>? hintToColor;
+  final Map<String, LetterHint> keys;
   final Function(String) onCharacterTap;
   final Function() onBackspaceTap;
   final Function() onEnterTap;
 
-  double spacing = 4.0;
-  double width = 34;
-  double height = 60;
-  double specialwidth = 55;
+  final double spacing = 4.0;
 
   @override
   Widget build(BuildContext context) {
@@ -549,71 +608,61 @@ class SoftKeyboard extends StatelessWidget {
             CharacterKey(
               character: 'Q',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['Q']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'W',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['W']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'E',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['E']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'R',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['R']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'T',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['T']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'Y',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['Y']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'U',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['U']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'I',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['I']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'O',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['O']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'P',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['P']],
             ),
           ],
         ),
@@ -625,64 +674,55 @@ class SoftKeyboard extends StatelessWidget {
             CharacterKey(
               character: 'A',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['A']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'S',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['S']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'D',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['D']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'F',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['F']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'G',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['G']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'H',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['H']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'J',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['J']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'K',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['K']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'L',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['L']],
             ),
             const Spacer(flex: 1),
           ],
@@ -693,63 +733,52 @@ class SoftKeyboard extends StatelessWidget {
           children: [
             EnterKey(
               onTap: onEnterTap,
-              height: height,
-              width: specialwidth,
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'Z',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['Z']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'X',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['X']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'C',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['C']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'V',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['V']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'B',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['B']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'N',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['N']],
             ),
             SizedBox(width: spacing),
             CharacterKey(
               character: 'M',
               onTap: onCharacterTap,
-              height: height,
-              width: width,
+              color: hintToColor == null ? null : hintToColor![keys['M']],
             ),
             SizedBox(width: spacing),
             BackspaceKey(
               onTap: onBackspaceTap,
-              height: height,
-              width: specialwidth,
             ),
           ],
         ),
@@ -763,14 +792,12 @@ class CharacterKey extends StatelessWidget {
       {super.key,
       required this.character,
       required this.onTap,
-      required this.height,
-      required this.width})
+      required this.color})
       : assert(character.length == 1);
 
   final String character;
   final Function(String) onTap;
-  final double height;
-  final double width;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -785,7 +812,7 @@ class CharacterKey extends StatelessWidget {
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.resolveWith<Color?>(
                 (Set<WidgetState> states) {
-              return Colors.grey[350];
+              return color;
             }),
             shape: WidgetStateProperty.resolveWith<OutlinedBorder?>(
                 (Set<WidgetState> states) {
@@ -813,15 +840,9 @@ class CharacterKey extends StatelessWidget {
 }
 
 class EnterKey extends StatelessWidget {
-  const EnterKey(
-      {super.key,
-      required this.onTap,
-      required this.height,
-      required this.width});
+  const EnterKey({super.key, required this.onTap});
 
   final Function() onTap;
-  final double height;
-  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -849,14 +870,12 @@ class EnterKey extends StatelessWidget {
               return EdgeInsets.zero;
             }),
           ),
-          child: Text(
-            'ENTER',
-            style: Theme.of(context)
-                .textTheme
-                .displaySmall!
-                .copyWith(color: Theme.of(context).colorScheme.onSurface)
-                .copyWith(fontSize: 12)
-          ),
+          child: Text('ENTER',
+              style: Theme.of(context)
+                  .textTheme
+                  .displaySmall!
+                  .copyWith(color: Theme.of(context).colorScheme.onSurface)
+                  .copyWith(fontSize: 12)),
         ),
       ),
     );
@@ -864,15 +883,9 @@ class EnterKey extends StatelessWidget {
 }
 
 class BackspaceKey extends StatelessWidget {
-  const BackspaceKey(
-      {super.key,
-      required this.onTap,
-      required this.height,
-      required this.width});
+  const BackspaceKey({super.key, required this.onTap});
 
   final Function() onTap;
-  final double height;
-  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -882,7 +895,10 @@ class BackspaceKey extends StatelessWidget {
         height: 60,
         child: IconButton(
           onPressed: onTap,
-          icon: const Icon(Icons.backspace_outlined, size: 24,),
+          icon: const Icon(
+            Icons.backspace_outlined,
+            size: 24,
+          ),
           style: ButtonStyle(
             backgroundColor: WidgetStateProperty.resolveWith<Color?>(
                 (Set<WidgetState> states) {
@@ -917,57 +933,46 @@ class Word extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 70,
+    return Expanded(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: Letter(
-              char: chars.isNotEmpty ? chars[0] : '',
-              hint: hints[0],
-              hintToColor: hintToColor,
-            ),
+          Letter(
+            char: chars.isNotEmpty ? chars[0] : '',
+            hint: hints[0],
+            hintToColor: hintToColor,
           ),
           const SizedBox(
             width: 5,
           ),
-          Expanded(
-            child: Letter(
-              char: chars.length > 1 ? chars[1] : '',
-              hint: hints[1],
-              hintToColor: hintToColor,
-            ),
+          Letter(
+            char: chars.length > 1 ? chars[1] : '',
+            hint: hints[1],
+            hintToColor: hintToColor,
           ),
           const SizedBox(
             width: 5,
           ),
-          Expanded(
-            child: Letter(
-              char: chars.length > 2 ? chars[2] : '',
-              hint: hints[2],
-              hintToColor: hintToColor,
-            ),
+          Letter(
+            char: chars.length > 2 ? chars[2] : '',
+            hint: hints[2],
+            hintToColor: hintToColor,
           ),
           const SizedBox(
             width: 5,
           ),
-          Expanded(
-            child: Letter(
-              char: chars.length > 3 ? chars[3] : '',
-              hint: hints[3],
-              hintToColor: hintToColor,
-            ),
+          Letter(
+            char: chars.length > 3 ? chars[3] : '',
+            hint: hints[3],
+            hintToColor: hintToColor,
           ),
           const SizedBox(
             width: 5,
           ),
-          Expanded(
-            child: Letter(
-              char: chars.length > 4 ? chars[4] : '',
-              hint: hints[4],
-              hintToColor: hintToColor,
-            ),
+          Letter(
+            char: chars.length > 4 ? chars[4] : '',
+            hint: hints[4],
+            hintToColor: hintToColor,
           ),
         ],
       ),
@@ -988,27 +993,32 @@ class Letter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // width: 70,
-      // height: 70,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: hintToColor == null ? null : hintToColor![hint],
-        border: Border.all(
-            color: Colors.black45, width: hint != LetterHint.none ? 0.5 : 1.2),
-        borderRadius: BorderRadius.circular(6.0),
-      ),
-      child: Text(
-        char,
-        style: hint != LetterHint.none
-            ? Theme.of(context)
-                .textTheme
-                .displayLarge!
-                .copyWith(color: Theme.of(context).colorScheme.surface)
-            : Theme.of(context)
-                .textTheme
-                .displayLarge!
-                .copyWith(color: Theme.of(context).colorScheme.onSurface),
+    return AspectRatio(
+      aspectRatio: 1,
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: hintToColor == null ? null : hintToColor![hint],
+          border: hint == LetterHint.none
+              ? Border.all(
+                  color: Colors.black45,
+                  width: 0.5,
+                )
+              : null,
+          borderRadius: BorderRadius.circular(6.0),
+        ),
+        child: Text(
+          char,
+          style: hint != LetterHint.none
+              ? Theme.of(context)
+                  .textTheme
+                  .displayLarge!
+                  .copyWith(color: Theme.of(context).colorScheme.surface)
+              : Theme.of(context)
+                  .textTheme
+                  .displayLarge!
+                  .copyWith(color: Theme.of(context).colorScheme.onSurface),
+        ),
       ),
     );
   }
