@@ -20,26 +20,6 @@ const Map<LetterHint, Color> _defaultHintToColorMap = {
   LetterHint.correct: Color(0xff4ca750)
 };
 
-String helperFormatHintString(List<List<LetterHint>> hints) {
-  String retval = "";
-  for (int i = 0; i < hints.length; i++) {
-    for (int j = 0; j < hints[i].length; j++) {
-      switch (hints[i][j]) {
-        case LetterHint.none:
-        // TODO: Handle this case.
-        case LetterHint.incorrect:
-          retval += "⬜️";
-        case LetterHint.wrongPlace:
-          retval += "🟨";
-        case LetterHint.correct:
-          retval += "🟩";
-      }
-    }
-    retval += "\n";
-  }
-  return retval;
-}
-
 class Wordlet extends StatefulWidget {
   /// Creates a widget to play a single game of Wordlet.
   ///
@@ -52,7 +32,7 @@ class Wordlet extends StatefulWidget {
       this.textInputColor,
       this.textFrozenColor,
       this.hintToColor = _defaultHintToColorMap,
-      required this.client})
+      this.client})
       : assert(target.length == 5),
         assert(alphaCapReg.allMatches(target).length == 5);
 
@@ -62,7 +42,7 @@ class Wordlet extends StatefulWidget {
   final Color? textInputColor;
   final Color? textFrozenColor;
   final Map<LetterHint, Color>? hintToColor;
-  final http.Client client;
+  final http.Client? client;
 
   @override
   State<Wordlet> createState() => _WordletState();
@@ -71,17 +51,44 @@ class Wordlet extends StatefulWidget {
 class _WordletState extends State<Wordlet> {
   final _wordLength = 5;
   final _maxWords = 6;
-  final FocusNode _focusNode = FocusNode();
+  final Map<String, List<int>> _charMap = {};
 
-  ConfettiController _confettiController = ConfettiController(
-    duration: const Duration(milliseconds: 100),
-  );
-  List<String> _targetChars = [];
-  Map<String, List<int>> _charMap = {};
-  List<String> _words = [];
-  List<List<LetterHint>> _hints = [];
-  int _index = 0;
-  GameState _gameState = GameState.inProgress;
+  late FocusNode _focusNode;
+  late ConfettiController _confettiController;
+  late List<String> _targetChars;
+  late List<String> _words;
+  late List<List<LetterHint>> _hints;
+  late int _index;
+  late GameState _gameState;
+
+  String getSubject() {
+    DateTime date = DateTime.now();
+    return "Wordlet ${date.month}/${date.day}/${date.year}";
+  }
+
+  String helperFormatHintString(
+    List<List<LetterHint>> hints,
+  ) {
+    String retval = getSubject();
+    retval += "\n";
+    for (int i = 0; i < hints.length; i++) {
+      for (int j = 0; j < hints[i].length; j++) {
+        switch (hints[i][j]) {
+          case LetterHint.none:
+          // TODO: Handle this case.
+          case LetterHint.incorrect:
+            retval += "⬜️";
+          case LetterHint.wrongPlace:
+            retval += "🟨";
+          case LetterHint.correct:
+            retval += "🟩";
+        }
+      }
+      retval += "\n";
+    }
+    retval += "https://davidmgray.com/wordlet/index.html";
+    return retval;
+  }
 
   /// Checks if a word is english.
   ///
@@ -99,15 +106,21 @@ class _WordletState extends State<Wordlet> {
 
   /// Compares a word against the target.
   bool isWordCorrect(String word) {
+    if (kDebugMode) {
+      print("$word != ${widget.target}");
+    }
     return (word == widget.target);
   }
 
   void handleWin() {
     setState(() {
       _confettiController.play();
-      _focusNode.dispose();
+      _focusNode.unfocus();
       _gameState = GameState.win;
     });
+    if (kDebugMode) {
+      print("you win!");
+    }
   }
 
   /// Updates the hints
@@ -158,9 +171,10 @@ class _WordletState extends State<Wordlet> {
 
     if (kDebugMode) {
       print("---------------");
-      // print("hints: $_hints");
       print("$dupeMap");
       print("$_charMap");
+      print("$_targetChars");
+      print(widget.target);
     }
 
     // Iterate through any duplicate characters and clean up extra labeling that causes confusion.
@@ -193,6 +207,9 @@ class _WordletState extends State<Wordlet> {
   }
 
   void submitWord(String word) {
+    if (kDebugMode) {
+      print("begin submit: ${widget.target}");
+    }
     updateHints(word);
     if (isWordCorrect(word)) {
       handleWin();
@@ -202,50 +219,69 @@ class _WordletState extends State<Wordlet> {
       // if all words have been entered lose
       if (_index > _maxWords - 1) {
         setState(() {
-          _focusNode.dispose();
+          _focusNode.unfocus();
           _gameState = GameState.lose;
         });
       }
     }
+    if (kDebugMode) {
+      print("end submit: ${widget.target}");
+    }
   }
 
-  KeyEventResult keyEventHandler(FocusNode node, KeyEvent event) {
-    // If [enter] key is pressed down and the word is 5 letters
-    if (event.logicalKey == LogicalKeyboardKey.enter &&
-        _words[_index].length == _wordLength &&
-        event.runtimeType == KeyDownEvent) {
-      // If word is valid english
+  void onEnter() {
+    if (_words[_index].length == _wordLength) {
       if (isWordValid(_words[_index])) {
-        // Submit
         submitWord(_words[_index]);
-        return KeyEventResult.handled;
       }
-      return KeyEventResult.ignored;
-      // If [backspace] was pressed
-    } else if (event.logicalKey == LogicalKeyboardKey.backspace &&
-        _words[_index].isNotEmpty &&
-        event.runtimeType == KeyDownEvent) {
+    }
+  }
+
+  void onBackspace() {
+    if (_words[_index].isNotEmpty) {
       setState(() {
         _words[_index] = _words[_index].substring(0, _words[_index].length - 1);
       });
+    }
+  }
 
+  void onCharacter(String character) {
+    if (character.contains(alphaCapReg) &&
+        _words[_index].length < _wordLength) {
+      setState(() {
+        _words[_index] += character;
+      });
+    }
+  }
+
+  KeyEventResult keyEventHandler(KeyEvent event) {
+    if (kDebugMode) {
+      print("handle key: ${event.logicalKey}");
+    }
+    // If [enter] key is pressed down and the word is 5 letters
+    if (event.logicalKey == LogicalKeyboardKey.enter &&
+        event.runtimeType == KeyDownEvent) {
+      onEnter();
+      return KeyEventResult.handled;
+      // If [backspace] was pressed
+    } else if (event.logicalKey == LogicalKeyboardKey.backspace &&
+        event.runtimeType == KeyDownEvent) {
+      onBackspace();
       return KeyEventResult.handled;
       // If a character was pressed
     } else if (event.character != null) {
       var upper = event.character!.toUpperCase();
-      if (upper.contains(alphaCapReg) && _words[_index].length < _wordLength) {
-        setState(() {
-          _words[_index] += upper;
-        });
-
-        return KeyEventResult.handled;
-      }
+      onCharacter(upper);
+      return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
   }
 
   @override
   void initState() {
+    _focusNode = FocusNode(
+      debugLabel: "wordlet",
+    );
     _targetChars = widget.target.split('');
     _words = List<String>.filled(_maxWords, "");
     _hints = List<List<LetterHint>>.generate(_maxWords, (i) {
@@ -266,11 +302,21 @@ class _WordletState extends State<Wordlet> {
       });
     }
 
+    if (kDebugMode) {
+      print("---------------");
+      print(widget.target);
+      print("$_targetChars");
+      print("$_charMap");
+    }
+
     super.initState();
   }
 
   @override
   void dispose() {
+    if (kDebugMode) {
+      print("dispose");
+    }
     _confettiController.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -278,66 +324,86 @@ class _WordletState extends State<Wordlet> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      autofocus: true,
-      descendantsAreFocusable: false,
+    return KeyboardListener(
       focusNode: _focusNode,
       onKeyEvent: keyEventHandler,
+      autofocus: true,
       child: Stack(
         alignment: Alignment.center,
         children: [
           Container(
             color: Theme.of(context).colorScheme.surface,
             child: SafeArea(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Word(
-                      chars: _words[0].split(''),
-                      hints: _hints[0],
-                      hintToColor: widget.hintToColor,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minWidth: 300,
+                        maxWidth: 370,
+                      ),
+                      child: Column(
+                        children: [
+                          Word(
+                            chars: _words[0].split(''),
+                            hints: _hints[0],
+                            hintToColor: widget.hintToColor,
+                          ),
+                          const SizedBox(
+                            height: 5,
+                          ),
+                          Word(
+                            chars: _words[1].split(''),
+                            hints: _hints[1],
+                            hintToColor: widget.hintToColor,
+                          ),
+                          const SizedBox(
+                            height: 5,
+                          ),
+                          Word(
+                            chars: _words[2].split(''),
+                            hints: _hints[2],
+                            hintToColor: widget.hintToColor,
+                          ),
+                          const SizedBox(
+                            height: 5,
+                          ),
+                          Word(
+                            chars: _words[3].split(''),
+                            hints: _hints[3],
+                            hintToColor: widget.hintToColor,
+                          ),
+                          const SizedBox(
+                            height: 5,
+                          ),
+                          Word(
+                            chars: _words[4].split(''),
+                            hints: _hints[4],
+                            hintToColor: widget.hintToColor,
+                          ),
+                          const SizedBox(
+                            height: 5,
+                          ),
+                          Word(
+                            chars: _words[5].split(''),
+                            hints: _hints[5],
+                            hintToColor: widget.hintToColor,
+                          ),
+                          const SizedBox(
+                            height: 10,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(
-                      height: 5,
-                    ),
-                    Word(
-                      chars: _words[1].split(''),
-                      hints: _hints[1],
-                      hintToColor: widget.hintToColor,
-                    ),
-                    const SizedBox(
-                      height: 5,
-                    ),
-                    Word(
-                      chars: _words[2].split(''),
-                      hints: _hints[2],
-                      hintToColor: widget.hintToColor,
-                    ),
-                    const SizedBox(
-                      height: 5,
-                    ),
-                    Word(
-                      chars: _words[3].split(''),
-                      hints: _hints[3],
-                      hintToColor: widget.hintToColor,
-                    ),
-                    const SizedBox(
-                      height: 5,
-                    ),
-                    Word(
-                      chars: _words[4].split(''),
-                      hints: _hints[4],
-                      hintToColor: widget.hintToColor,
-                    ),
-                    const SizedBox(
-                      height: 5,
-                    ),
-                    Word(
-                      chars: _words[5].split(''),
-                      hints: _hints[5],
-                      hintToColor: widget.hintToColor,
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 550),
+                      child: SoftKeyboard(
+                        onCharacterTap: onCharacter,
+                        onBackspaceTap: onBackspace,
+                        onEnterTap: onEnter,
+                      ),
                     ),
                   ],
                 ),
@@ -346,7 +412,7 @@ class _WordletState extends State<Wordlet> {
           ),
           SafeArea(
             child: Align(
-              alignment: const Alignment(0, -0.82),
+              alignment: const Alignment(0, -0.88),
               child: AnimatedContainer(
                 height: 45,
                 width: 110,
@@ -373,21 +439,72 @@ class _WordletState extends State<Wordlet> {
           ),
           SafeArea(
             child: Align(
-              alignment: const Alignment(0, 0.82),
-              child:
-                  (_gameState == GameState.lose || _gameState == GameState.win)
-                      ? IconButton(
-                          onPressed: () async {
-                            var str = helperFormatHintString(_hints);
-                            final result = await Share.share(str);
+              alignment: Alignment.bottomCenter,
+              child: (_gameState == GameState.lose ||
+                      _gameState == GameState.win)
+                  ? Padding(
+                      padding:
+                          const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            child: ElevatedButton(
+                              style: ButtonStyle(
+                                backgroundColor:
+                                    WidgetStateProperty.resolveWith<Color?>(
+                                        (Set<WidgetState> states) {
+                                  return Theme.of(context).colorScheme.surface;
+                                }),
+                                padding: WidgetStateProperty.resolveWith<
+                                        EdgeInsetsGeometry?>(
+                                    (Set<WidgetState> states) {
+                                  return const EdgeInsets.all(16);
+                                }),
+                                elevation:
+                                    WidgetStateProperty.resolveWith<double?>(
+                                        (Set<WidgetState> states) {
+                                  return 20;
+                                }),
+                              ),
+                              onPressed: () async {
+                                var str = helperFormatHintString(_hints);
+                                final result = await Share.share(str,
+                                    subject: getSubject());
 
-                            if (result.status == ShareResultStatus.success) {
-                              print('Thank you for sharing my website!');
-                            }
-                          },
-                          icon: const Icon(CupertinoIcons.share),
-                        )
-                      : null,
+                                if (result.status ==
+                                    ShareResultStatus.success) {
+                                  print('Thank you for sharing my website!');
+                                }
+                              },
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Share with a friend!",
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Icon(
+                                    CupertinoIcons.share,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : null,
             ),
           ),
           ConfettiWidget(
@@ -400,6 +517,389 @@ class _WordletState extends State<Wordlet> {
             colors: widget.confettiColors,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class SoftKeyboard extends StatelessWidget {
+  SoftKeyboard(
+      {super.key,
+      required this.onCharacterTap,
+      required this.onBackspaceTap,
+      required this.onEnterTap});
+
+  final Function(String) onCharacterTap;
+  final Function() onBackspaceTap;
+  final Function() onEnterTap;
+
+  double spacing = 4.0;
+  double width = 34;
+  double height = 60;
+  double specialwidth = 55;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CharacterKey(
+              character: 'Q',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'W',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'E',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'R',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'T',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'Y',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'U',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'I',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'O',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'P',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+          ],
+        ),
+        SizedBox(height: spacing),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Spacer(flex: 1),
+            CharacterKey(
+              character: 'A',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'S',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'D',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'F',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'G',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'H',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'J',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'K',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'L',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            const Spacer(flex: 1),
+          ],
+        ),
+        SizedBox(height: spacing),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            EnterKey(
+              onTap: onEnterTap,
+              height: height,
+              width: specialwidth,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'Z',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'X',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'C',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'V',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'B',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'N',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            CharacterKey(
+              character: 'M',
+              onTap: onCharacterTap,
+              height: height,
+              width: width,
+            ),
+            SizedBox(width: spacing),
+            BackspaceKey(
+              onTap: onBackspaceTap,
+              height: height,
+              width: specialwidth,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class CharacterKey extends StatelessWidget {
+  const CharacterKey(
+      {super.key,
+      required this.character,
+      required this.onTap,
+      required this.height,
+      required this.width})
+      : assert(character.length == 1);
+
+  final String character;
+  final Function(String) onTap;
+  final double height;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: 2,
+      child: SizedBox(
+        height: 60,
+        child: TextButton(
+          onPressed: () {
+            onTap(character);
+          },
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                (Set<WidgetState> states) {
+              return Colors.grey[350];
+            }),
+            shape: WidgetStateProperty.resolveWith<OutlinedBorder?>(
+                (Set<WidgetState> states) {
+              return RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              );
+            }),
+            padding: WidgetStateProperty.resolveWith<EdgeInsetsGeometry?>(
+                (Set<WidgetState> states) {
+              return EdgeInsets.zero;
+            }),
+          ),
+          child: Text(
+            character,
+            style: Theme.of(context)
+                .textTheme
+                .displaySmall!
+                .copyWith(color: Theme.of(context).colorScheme.onSurface),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class EnterKey extends StatelessWidget {
+  const EnterKey(
+      {super.key,
+      required this.onTap,
+      required this.height,
+      required this.width});
+
+  final Function() onTap;
+  final double height;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: 3,
+      child: SizedBox(
+        height: 60,
+        child: TextButton(
+          onPressed: () {
+            onTap();
+          },
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                (Set<WidgetState> states) {
+              return Colors.grey[350];
+            }),
+            shape: WidgetStateProperty.resolveWith<OutlinedBorder?>(
+                (Set<WidgetState> states) {
+              return RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              );
+            }),
+            padding: WidgetStateProperty.resolveWith<EdgeInsetsGeometry?>(
+                (Set<WidgetState> states) {
+              return EdgeInsets.zero;
+            }),
+          ),
+          child: Text(
+            'ENTER',
+            style: Theme.of(context)
+                .textTheme
+                .displaySmall!
+                .copyWith(color: Theme.of(context).colorScheme.onSurface)
+                .copyWith(fontSize: 12)
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class BackspaceKey extends StatelessWidget {
+  const BackspaceKey(
+      {super.key,
+      required this.onTap,
+      required this.height,
+      required this.width});
+
+  final Function() onTap;
+  final double height;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: 3,
+      child: SizedBox(
+        height: 60,
+        child: IconButton(
+          onPressed: onTap,
+          icon: const Icon(Icons.backspace_outlined, size: 24,),
+          style: ButtonStyle(
+            backgroundColor: WidgetStateProperty.resolveWith<Color?>(
+                (Set<WidgetState> states) {
+              return Colors.grey[350];
+            }),
+            shape: WidgetStateProperty.resolveWith<OutlinedBorder?>(
+                (Set<WidgetState> states) {
+              return RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(4),
+              );
+            }),
+            padding: WidgetStateProperty.resolveWith<EdgeInsetsGeometry?>(
+                (Set<WidgetState> states) {
+              return EdgeInsets.zero;
+            }),
+          ),
+        ),
       ),
     );
   }
@@ -422,42 +922,52 @@ class Word extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Letter(
-            char: chars.isNotEmpty ? chars[0] : '',
-            hint: hints[0],
-            hintToColor: hintToColor,
+          Expanded(
+            child: Letter(
+              char: chars.isNotEmpty ? chars[0] : '',
+              hint: hints[0],
+              hintToColor: hintToColor,
+            ),
           ),
           const SizedBox(
             width: 5,
           ),
-          Letter(
-            char: chars.length > 1 ? chars[1] : '',
-            hint: hints[1],
-            hintToColor: hintToColor,
+          Expanded(
+            child: Letter(
+              char: chars.length > 1 ? chars[1] : '',
+              hint: hints[1],
+              hintToColor: hintToColor,
+            ),
           ),
           const SizedBox(
             width: 5,
           ),
-          Letter(
-            char: chars.length > 2 ? chars[2] : '',
-            hint: hints[2],
-            hintToColor: hintToColor,
+          Expanded(
+            child: Letter(
+              char: chars.length > 2 ? chars[2] : '',
+              hint: hints[2],
+              hintToColor: hintToColor,
+            ),
           ),
           const SizedBox(
             width: 5,
           ),
-          Letter(
-            char: chars.length > 3 ? chars[3] : '',
-            hint: hints[3],
-            hintToColor: hintToColor,
+          Expanded(
+            child: Letter(
+              char: chars.length > 3 ? chars[3] : '',
+              hint: hints[3],
+              hintToColor: hintToColor,
+            ),
           ),
           const SizedBox(
             width: 5,
           ),
-          Letter(
-            char: chars.length > 4 ? chars[4] : '',
-            hint: hints[4],
-            hintToColor: hintToColor,
+          Expanded(
+            child: Letter(
+              char: chars.length > 4 ? chars[4] : '',
+              hint: hints[4],
+              hintToColor: hintToColor,
+            ),
           ),
         ],
       ),
@@ -479,8 +989,8 @@ class Letter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 70,
-      height: 70,
+      // width: 70,
+      // height: 70,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: hintToColor == null ? null : hintToColor![hint],

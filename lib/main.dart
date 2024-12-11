@@ -11,21 +11,25 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations(
       [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  MyApp({super.key});
+  const MyApp({super.key});
 
-  final client = http.Client();
+  // final client = http.Client();
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      color: Theme.of(context).colorScheme.surface,
       title: 'Wordlet',
+      themeMode: ThemeMode.light,
       theme: ThemeData(
-        colorScheme: const ColorScheme.light(),
+        colorScheme: const ColorScheme.light(
+          primary: Colors.white,
+        ),
         useMaterial3: true,
         textTheme: TextTheme(
           displayLarge: GoogleFonts.lato(
@@ -37,12 +41,22 @@ class MyApp extends StatelessWidget {
             fontSize: 22,
             fontWeight: FontWeight.w700,
           ),
+          displaySmall: GoogleFonts.lato(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+          ),
+          labelSmall: GoogleFonts.lato(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
-      home: Wordlet(
-        target: theList[Random().nextInt(theList.length)], client: client, // TODO: get word from database
+      home: Scaffold(
+        body: Wordlet(
+          target: theList[
+              Random().nextInt(theList.length)], // TODO: get word from database
+        ),
       ),
     );
   }
 }
-
