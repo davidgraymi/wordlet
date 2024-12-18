@@ -104,13 +104,14 @@ class _WordletState extends State<Wordlet> {
   String helperFormatHintString(
     List<List<LetterHint>> hints,
   ) {
-    String retval = getSubject();
-    retval += "\n";
+    String retval = "";
+    bool stop = false;
     for (int i = 0; i < hints.length; i++) {
       for (int j = 0; j < hints[i].length; j++) {
         switch (hints[i][j]) {
           case LetterHint.none:
-          // TODO: Handle this case.
+            stop = true;
+            break;
           case LetterHint.incorrect:
             retval += "⬜️";
           case LetterHint.wrongPlace:
@@ -119,9 +120,12 @@ class _WordletState extends State<Wordlet> {
             retval += "🟩";
         }
       }
+      if (stop) {
+        break;
+      }
       retval += "\n";
     }
-    retval += "https://davidmgray.com/wordlet/index.html";
+    retval += "https://davidmgray.com/wordlet";
     return retval;
   }
 
@@ -526,6 +530,9 @@ class _WordletState extends State<Wordlet> {
                                 ),
                                 onPressed: () async {
                                   var str = helperFormatHintString(_hints);
+                                  if (kDebugMode) {
+                                    print(str);
+                                  }
                                   final result = await Share.share(str,
                                       subject: getSubject());
 
