@@ -36,8 +36,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
   confetti: ^0.8.0
-  http: ^1.2.2
+#  http: ^1.2.2
   share_plus: ^10.1.2
+  lemmatizerx: ^1.0.0
 
 dev_dependencies:
   flutter_test:

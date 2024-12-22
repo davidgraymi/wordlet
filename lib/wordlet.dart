@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:lemmatizerx/lemmatizerx.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'constants.dart';
@@ -56,6 +57,7 @@ class Wordlet extends StatefulWidget {
 }
 
 class _WordletState extends State<Wordlet> {
+  final Lemmatizer lemmatizer = Lemmatizer();
   final _wordLength = 5;
   final _maxWords = 6;
   final Map<String, List<int>> _charMap = {};
@@ -140,7 +142,21 @@ class _WordletState extends State<Wordlet> {
     // print('Response body: ${response.body}');
     //
     // print(await http.read(Uri.https('example.com', 'foobar.txt')));
-    return (word.length == _wordLength);
+    for (POS pos in POS.values) {
+      if (pos == POS.UNKNOWN) {
+        continue;
+      }
+      Lemma lemma = lemmatizer.lemma(word, pos);
+      if (kDebugMode) {
+        print(lemma);
+      }
+      for (int i = 0; i < lemma.lemmas.length; i++) {
+        if (lemma.lemmas[i] == lemma.form) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// Compares a word against the target.
