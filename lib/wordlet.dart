@@ -3,7 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
 import 'package:lemmatizerx/lemmatizerx.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -39,8 +38,8 @@ class Wordlet extends StatefulWidget {
       this.backgroundColor,
       this.textInputColor,
       this.textFrozenColor,
-      this.hintToColor = _defaultHintToColorMap,
-      this.client})
+      this.hintToColor = _defaultHintToColorMap})
+      // this.client})
       : assert(target.length == 5),
         assert(alphaCapReg.allMatches(target).length == 5);
 
@@ -50,7 +49,7 @@ class Wordlet extends StatefulWidget {
   final Color? textInputColor;
   final Color? textFrozenColor;
   final Map<LetterHint, Color>? hintToColor;
-  final http.Client? client;
+  // final http.Client? client;
 
   @override
   State<Wordlet> createState() => _WordletState();
@@ -131,17 +130,12 @@ class _WordletState extends State<Wordlet> {
     return retval;
   }
 
-  /// Checks if a word is english.
-  ///
-  /// TODO: implement
+  /// Checks if a word is english by using lemmas. There is currently a problem were
+  /// plural words like `leaps` results in `leap` being found but not the full word.
+  /// To account for this, this function returns true if an lemma is found, not
+  /// exclusively on exact matches.
   bool isWordValid(String word) {
-    // String db = "https://api.dictionaryapi.dev/api/v2/entries/en/$word";
-    // var url = Uri.https('api.dictionaryapi.dev', 'api/v2/entries/en/$word');
-    // var response = await widget.client.get(url);
-    // print('Response status: ${response.statusCode}');
-    // print('Response body: ${response.body}');
-    //
-    // print(await http.read(Uri.https('example.com', 'foobar.txt')));
+    bool foundNear = false;
     for (POS pos in POS.values) {
       if (pos == POS.UNKNOWN) {
         continue;
@@ -151,12 +145,22 @@ class _WordletState extends State<Wordlet> {
         print(lemma);
       }
       for (int i = 0; i < lemma.lemmas.length; i++) {
+        foundNear = true;
         if (lemma.lemmas[i] == lemma.form) {
           return true;
         }
       }
     }
-    return false;
+    return foundNear;
+
+    // TODO: implement real dictionary api
+    // String db = "https://api.dictionaryapi.dev/api/v2/entries/en/$word";
+    // var url = Uri.https('api.dictionaryapi.dev', 'api/v2/entries/en/$word');
+    // var response = await widget.client.get(url);
+    // print('Response status: ${response.statusCode}');
+    // print('Response body: ${response.body}');
+    //
+    // print(await http.read(Uri.https('example.com', 'foobar.txt')));
   }
 
   /// Compares a word against the target.
@@ -300,8 +304,10 @@ class _WordletState extends State<Wordlet> {
 
   void onEnter() {
     if (_words[_index].length == _wordLength) {
-      if (isWordValid(_words[_index])) {
+      if (isWordValid(_words[_index]) || isWordCorrect(_words[_index])) {
         submitWord(_words[_index]);
+      } else {
+        // wrong animation
       }
     }
   }
